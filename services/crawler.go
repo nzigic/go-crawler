@@ -16,73 +16,58 @@ type CrawlResult struct {
 
 func Crawl(rootUrl string) (r []CrawlResult, err error) {
 	r = []CrawlResult{}
-	var processWg sync.WaitGroup
-	var readWg sync.WaitGroup
+	var wg sync.WaitGroup
 
 	visitedUrls := make(map[string]bool)
 	processedUrls := make(map[string]bool)
 	chanExtractedLinks := make(chan string)
-	chanCrawlResults := make(chan CrawlResult)
 
+	wg.Add(1)
 	go func() {
 		chanExtractedLinks <- rootUrl
 	}()
 
 	go func() {
 		defer close(chanExtractedLinks)
-		processWg.Wait()
+		wg.Wait()
 	}()
 
-	go func() {
-		defer close(chanCrawlResults)
-		readWg.Wait()
-	}()
+	for extractedLink := range chanExtractedLinks {
+		if !visitedUrls[extractedLink] {
+			visitedUrls[extractedLink] = true
+			wg.Add(1)
 
-	go func() {
-		for extractedLink := range chanExtractedLinks {
-			if !visitedUrls[extractedLink] {
-				visitedUrls[extractedLink] = true
-				processWg.Add(1)
-
-				go func(url string) {
-					defer processWg.Done()
-					extractedLinks, extractErr := extractLinks(url)
-					if extractErr != nil {
-						chanCrawlResults <- CrawlResult{
-							url:    url,
-							broken: true,
-						}
+			go func(url string) {
+				wg.Done()
+				extractedLinks, extractErr := extractLinks(url)
+				if extractErr != nil {
+					crawlResult := CrawlResult{
+						url:    url,
+						broken: true,
 					}
+					r = append(r, crawlResult)
+				}
 
-					for _, relativeUrl := range extractedLinks {
-						newUrl := rootUrl + relativeUrl
-						chanExtractedLinks <- newUrl
-					}
-				}(extractedLink)
-			}
-
-			if !processedUrls[extractedLink] {
-				processedUrls[extractedLink] = true
-
-				processWg.Add(1)
-				go func(url string) {
-					defer processWg.Done()
-
-					crawlResult := processLink(url)
-					chanCrawlResults <- crawlResult
-					readWg.Add(1)
-				}(extractedLink)
-			}
+				for _, relativeUrl := range extractedLinks {
+					newUrl := rootUrl + relativeUrl
+					chanExtractedLinks <- newUrl
+				}
+			}(extractedLink)
 		}
-	}()
 
-	for crawlResult := range chanCrawlResults {
-		readWg.Add(1)
-		fmt.Println(crawlResult)
-		r = append(r, crawlResult)
-		defer readWg.Done()
+		if !processedUrls[extractedLink] {
+			processedUrls[extractedLink] = true
 
-		fmt.Println(&readWg)
+			wg.Add(1)
+			go func(url string) {
+				wg.Done()
+
+				crawlResult := processLink(url)
+				r = append(r, crawlResult)
+			}(extractedLink)
+		}
+
+		fmt.Println("loop", &wg)
 	}
 
 	fmt.Println("end")
