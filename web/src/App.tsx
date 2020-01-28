@@ -9,11 +9,9 @@ import TableContainer from '@material-ui/core/TableContainer';
 import TableHead from '@material-ui/core/TableHead';
 import TableRow from '@material-ui/core/TableRow';
 import Paper from '@material-ui/core/Paper';
-import { CrawlerServiceClient } from './api/crawler-service';
-import axios, { AxiosResponse } from "axios";
 import { CrawlResult } from './api/crawler-vo';
-import CircularProgress from '@material-ui/core/CircularProgress';
-import { red } from '@material-ui/core/colors';
+import getClient from './utils/getClient';
+import { LinearProgress } from '@material-ui/core';
 
 const useStyles = makeStyles({
   table: {
@@ -32,23 +30,9 @@ interface Row {
 
 const defaultRows: Row[] = [];
 
-const getTransport = (endpoint: string) => async function <T>(method: string, args: any[] | undefined) {
-  return new Promise<T>(async (resolve, reject) => {
-    try {
-      let axiosPromise: AxiosResponse<T> = await axios.post<T>(
-        endpoint + "/" + encodeURIComponent(method),
-        JSON.stringify(args),
-      );
-      return resolve(axiosPromise.data);
-    } catch (e) {
-      return reject(e);
-    }
-  });
-};
-
 const fetchData = async () => {
-  const svc = new CrawlerServiceClient(getTransport('http://localhost:8080' + CrawlerServiceClient.defaultEndpoint))
-  const links = await svc.crawl('http://bestbytes.de');
+  const client = getClient();
+  const links = await client.crawl('http://bestbytes.de');
 
   return links.map((link: CrawlResult): Row => ({
     url: link.Url,
@@ -73,8 +57,8 @@ const App: React.FC = () => {
     <div className="App">
       <Button variant="contained" color="primary" onClick={handleClick}>
         Check bestbytes.de
-        {isLoading && <CircularProgress color="secondary" />}
       </Button>
+      {isLoading && <LinearProgress color="primary" />}
 
       <TableContainer component={Paper}>
         <Table className={classes.table} aria-label="simple table">
@@ -89,7 +73,7 @@ const App: React.FC = () => {
             {rows.map(row => (
               <TableRow key={row.url} className={row.broken ? classes.brokenLink : ''}>
                 <TableCell component="th" scope="row">
-                  {row.url}
+                  <a href={row.url} target="_blank">{row.url}</a>
                 </TableCell>
                 <TableCell align="right">{!row.broken ? 'Yes' : 'No'}</TableCell>
                 <TableCell align="right">{row.message || '-'}</TableCell>
