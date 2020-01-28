@@ -11,7 +11,7 @@ import (
 
 type CrawlResult struct {
 	url    string
-	status int
+	broken bool
 }
 
 func Crawl(rootUrl string) (r []CrawlResult, err error) {
@@ -24,8 +24,6 @@ func Crawl(rootUrl string) (r []CrawlResult, err error) {
 	chanExtractedLinks := make(chan string)
 	chanCrawlResults := make(chan CrawlResult)
 
-	processWg.Add(1)
-	readWg.Add(1)
 	go func() {
 		chanExtractedLinks <- rootUrl
 	}()
@@ -40,48 +38,51 @@ func Crawl(rootUrl string) (r []CrawlResult, err error) {
 		readWg.Wait()
 	}()
 
-	for extractedLink := range chanExtractedLinks {
-		if !visitedUrls[extractedLink] {
-			visitedUrls[extractedLink] = true
-			processWg.Add(1)
+	go func() {
+		for extractedLink := range chanExtractedLinks {
+			if !visitedUrls[extractedLink] {
+				visitedUrls[extractedLink] = true
+				processWg.Add(1)
 
-			go func(l string) {
-				processWg.Done()
-				extractedLinks, extractErr := extractLinks(extractedLink)
-				if extractErr != nil {
-					chanCrawlResults <- CrawlResult{
-						url:    l,
-						status: 500,
+				go func(url string) {
+					defer processWg.Done()
+					extractedLinks, extractErr := extractLinks(url)
+					if extractErr != nil {
+						chanCrawlResults <- CrawlResult{
+							url:    url,
+							broken: true,
+						}
 					}
-				}
 
-				for i, _ := range extractedLinks {
-					url := rootUrl + extractedLinks[i]
-					chanExtractedLinks <- url
-				}
-			}(extractedLink)
+					for _, relativeUrl := range extractedLinks {
+						newUrl := rootUrl + relativeUrl
+						chanExtractedLinks <- newUrl
+					}
+				}(extractedLink)
+			}
+
+			if !processedUrls[extractedLink] {
+				processedUrls[extractedLink] = true
+
+				processWg.Add(1)
+				go func(url string) {
+					defer processWg.Done()
+
+					crawlResult := processLink(url)
+					chanCrawlResults <- crawlResult
+					readWg.Add(1)
+				}(extractedLink)
+			}
 		}
-
-		if !processedUrls[extractedLink] {
-			processedUrls[extractedLink] = true
-
-			processWg.Add(1)
-			go func(url string) {
-				processWg.Done()
-
-				crawlResult := processLink(url)
-				chanCrawlResults <- crawlResult
-			}(extractedLink)
-		}
-
-		fmt.Println("loop ", &processWg)
-	}
+	}()
 
 	for crawlResult := range chanCrawlResults {
 		readWg.Add(1)
 		fmt.Println(crawlResult)
 		r = append(r, crawlResult)
-		readWg.Done()
+		defer readWg.Done()
+
+		fmt.Println(&readWg)
 	}
 
 	fmt.Println("end")
@@ -113,18 +114,16 @@ func extractLinks(pageUrl string) (r []string, err error) {
 }
 
 func processLink(link string) (r CrawlResult) {
-	resp, errGet := http.Get(link)
+	_, errGet := http.Get(link)
 	if errGet != nil {
-		fmt.Println(" ERROR GET: ", errGet)
 		return CrawlResult{
 			url:    link,
-			status: 500,
+			broken: true,
 		}
 	}
 
 	r = CrawlResult{
-		url:    link,
-		status: resp.StatusCode,
+		url: link,
 	}
 
 	return
