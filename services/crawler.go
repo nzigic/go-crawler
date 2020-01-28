@@ -19,7 +19,6 @@ func Crawl(rootUrl string) (r []CrawlResult, err error) {
 	var wg sync.WaitGroup
 
 	visitedUrls := make(map[string]bool)
-	processedUrls := make(map[string]bool)
 	chanExtractedLinks := make(chan string)
 
 	wg.Add(1)
@@ -32,45 +31,38 @@ func Crawl(rootUrl string) (r []CrawlResult, err error) {
 		wg.Wait()
 	}()
 
+	isFirstRun := true
 	for extractedLink := range chanExtractedLinks {
 		if !visitedUrls[extractedLink] {
 			visitedUrls[extractedLink] = true
 			wg.Add(1)
+			if isFirstRun {
+				isFirstRun = false
+				wg.Done()
+			}
 
 			go func(url string) {
-				wg.Done()
+				defer wg.Done()
 				extractedLinks, extractErr := extractLinks(url)
+				crawlResult := CrawlResult{
+					url: url,
+				}
+
 				if extractErr != nil {
-					crawlResult := CrawlResult{
-						url:    url,
-						broken: true,
+					crawlResult.broken = true
+				} else {
+					for _, relativeUrl := range extractedLinks {
+						newUrl := rootUrl + relativeUrl
+						chanExtractedLinks <- newUrl
 					}
-					r = append(r, crawlResult)
 				}
 
-				for _, relativeUrl := range extractedLinks {
-					newUrl := rootUrl + relativeUrl
-					chanExtractedLinks <- newUrl
-				}
-			}(extractedLink)
-		}
-
-		if !processedUrls[extractedLink] {
-			processedUrls[extractedLink] = true
-
-			wg.Add(1)
-			go func(url string) {
-				wg.Done()
-
-				crawlResult := processLink(url)
 				r = append(r, crawlResult)
 			}(extractedLink)
 		}
-
-		fmt.Println("loop", &wg)
 	}
 
-	fmt.Println("end")
+	fmt.Println(rootUrl, "processed")
 	return
 }
 
@@ -94,22 +86,6 @@ func extractLinks(pageUrl string) (r []string, err error) {
 			r = append(r, link)
 		}
 	})
-
-	return
-}
-
-func processLink(link string) (r CrawlResult) {
-	_, errGet := http.Get(link)
-	if errGet != nil {
-		return CrawlResult{
-			url:    link,
-			broken: true,
-		}
-	}
-
-	r = CrawlResult{
-		url: link,
-	}
 
 	return
 }
