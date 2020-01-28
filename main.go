@@ -5,19 +5,21 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/fatih/color"
 )
 
 func main() {
 	s := crawler.New()
-	fmt.Println(os.Args[0])
 	if len(os.Args) != 0 && (os.Args[1] == "--web" || os.Args[1] == "-w") {
 		proxy := crawler.NewDefaultCrawlerServiceGoTSRPCProxy(s, []string{"*"})
 		fmt.Println("server started on port 8080")
 
 		http.ListenAndServe(":8080", proxy)
 	}
+
+	start := time.Now()
 
 	fmt.Println("CLI running...")
 	results := s.Crawl("http://bestbytes.de")
@@ -30,6 +32,10 @@ func main() {
 		fmt.Printf("%s: '%s'", link.Url, link.Message)
 		fmt.Println()
 	}
+
+	elapsed := time.Since(start)
+	fmt.Printf("took %s", elapsed)
+	fmt.Println()
 }
 
 func filterBrokenLinks(links []crawler.CrawlResult) (out []crawler.CrawlResult) {

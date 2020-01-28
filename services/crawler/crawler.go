@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -45,6 +46,10 @@ func (s *CrawlerService) Crawl(rootUrl string) (r []CrawlResult) {
 	}()
 
 	isFirstRun := true
+	var linkCounter int64
+	var averageElapsedPerPage float64
+	start := time.Now()
+
 	for extractedLink := range chanExtractedLinks {
 		if !visitedUrls[extractedLink] {
 			visitedUrls[extractedLink] = true
@@ -72,6 +77,12 @@ func (s *CrawlerService) Crawl(rootUrl string) (r []CrawlResult) {
 				}
 
 				r = append(r, crawlResult)
+
+				linkCounter++
+				elapsed := time.Since(start)
+				averageElapsedPerPage = float64(elapsed.Milliseconds()) / float64(linkCounter)
+				fmt.Printf("\rProcessed: %d links, average time per URL: %fms", linkCounter, averageElapsedPerPage)
+
 			}(extractedLink)
 		}
 	}
