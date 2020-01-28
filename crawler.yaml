@@ -1,21 +1,16 @@
 modulekind: commonjs
 tsclientflavor: async
 targets:
-  demo:
+  crawler:
     services:
-      /service/foo: Foo
-      /service/demo: Demo
-    package: github.com/foomo/gotsrpc/demo
-    out: /tmp/test.ts
+      /services/crawler: CrawlerService
+    package: crawler/services/crawler
+    out: web/api/crawler-service.ts
     gorpc:
-      - Foo
-      - Demo
+      - CrawlerService
     tsrpc:
-      - Foo
-      - Demo
+      - CrawlerService
 
 mappings:
-  github.com/foomo/gotsrpc/demo:
-    out: /tmp/test-files-demo.ts
-  github.com/foomo/gotsrpc/demo/nested:
-    out: /tmp/test-files-demo-nested.ts
+  crawler/services/crawler:
+    out: web/api/crawler-vo.ts

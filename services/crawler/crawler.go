@@ -1,6 +1,7 @@
 package crawler
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -9,12 +10,24 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-type CrawlResult struct {
-	url    string
-	broken bool
+type CrawlerService struct {
 }
 
-func Crawl(rootUrl string) (r []CrawlResult, err error) {
+type CrawlResult struct {
+	Url     string
+	Broken  bool
+	Message string
+}
+
+type CrawlRequest struct {
+	rootUrl string
+}
+
+func New() *CrawlerService {
+	return &CrawlerService{}
+}
+
+func (s *CrawlerService) Crawl(rootUrl string) (r []CrawlResult) {
 	r = []CrawlResult{}
 	var wg sync.WaitGroup
 
@@ -45,11 +58,12 @@ func Crawl(rootUrl string) (r []CrawlResult, err error) {
 				defer wg.Done()
 				extractedLinks, extractErr := extractLinks(url)
 				crawlResult := CrawlResult{
-					url: url,
+					Url: url,
 				}
 
 				if extractErr != nil {
-					crawlResult.broken = true
+					crawlResult.Broken = true
+					crawlResult.Message = extractErr.Error()
 				} else {
 					for _, relativeUrl := range extractedLinks {
 						newUrl := rootUrl + relativeUrl
@@ -62,7 +76,7 @@ func Crawl(rootUrl string) (r []CrawlResult, err error) {
 		}
 	}
 
-	fmt.Println(rootUrl, "processed")
+	fmt.Println()
 	return
 }
 
@@ -70,6 +84,10 @@ func extractLinks(pageUrl string) (r []string, err error) {
 	resp, errGet := http.Get(pageUrl)
 	if errGet != nil {
 		return nil, errGet
+	}
+
+	if resp.StatusCode != 200 {
+		return nil, errors.New(resp.Status)
 	}
 
 	defer resp.Body.Close()
