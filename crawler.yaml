@@ -1,0 +1,21 @@
+modulekind: commonjs
+tsclientflavor: async
+targets:
+  demo:
+    services:
+      /service/foo: Foo
+      /service/demo: Demo
+    package: github.com/foomo/gotsrpc/demo
+    out: /tmp/test.ts
+    gorpc:
+      - Foo
+      - Demo
+    tsrpc:
+      - Foo
+      - Demo
+
+mappings:
+  github.com/foomo/gotsrpc/demo:
+    out: /tmp/test-files-demo.ts
+  github.com/foomo/gotsrpc/demo/nested:
+    out: /tmp/test-files-demo-nested.ts
