@@ -33,7 +33,7 @@ func (s *CrawlerService) Crawl(rootUrl string) (r []CrawlResult) {
 	var wg sync.WaitGroup
 
 	visitedUrls := make(map[string]bool)
-	chanExtractedLinks := make(chan string)
+	chanExtractedLinks := make(chan string, 5)
 
 	wg.Add(1)
 	go func() {
@@ -70,9 +70,9 @@ func (s *CrawlerService) Crawl(rootUrl string) (r []CrawlResult) {
 					crawlResult.Broken = true
 					crawlResult.Message = extractErr.Error()
 				} else {
-					for _, relativeUrl := range extractedLinks {
-						newUrl := rootUrl + relativeUrl
-						chanExtractedLinks <- newUrl
+					validLinks := filterInternalLinks(extractedLinks, rootUrl)
+					for _, link := range validLinks {
+						chanExtractedLinks <- link
 					}
 				}
 
@@ -111,10 +111,27 @@ func extractLinks(pageUrl string) (r []string, err error) {
 
 	doc.Find("a").Each(func(i int, s *goquery.Selection) {
 		link, hrefExists := s.Attr("href")
-		if hrefExists && strings.HasPrefix(link, "/") {
+		if hrefExists {
 			r = append(r, link)
 		}
 	})
 
 	return
+}
+
+func filterInternalLinks(extractedLinks []string, rootUrl string) []string {
+	result := []string{}
+	for _, link := range extractedLinks {
+		if strings.HasPrefix(link, "/") {
+			result = append(result, rootUrl+link)
+			continue
+		}
+
+		if strings.HasPrefix(link, rootUrl) {
+			result = append(result, link)
+		}
+	}
+
+	return result
+
 }
