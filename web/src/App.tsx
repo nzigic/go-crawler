@@ -23,8 +23,8 @@ const useStyles = makeStyles({
 });
 
 interface Row {
-  url: string;
-  broken: boolean;
+  url?: string;
+  broken?: boolean;
   message?: string;
 }
 
@@ -35,9 +35,9 @@ const fetchData = async () => {
   const links = await client.crawl('http://bestbytes.de');
 
   return links.map((link: CrawlResult): Row => ({
-    url: link.Url,
-    broken: link.Broken,
-    message: link.Message
+    url: link.url,
+    broken: link.broken,
+    message: link.message
   }));
 }
 

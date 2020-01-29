@@ -1,5 +1,6 @@
 package main
 
+// todo: docker 2-step build process
 import (
 	crawler "crawler/services/crawler"
 	"fmt"

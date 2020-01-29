@@ -15,13 +15,9 @@ type CrawlerService struct {
 }
 
 type CrawlResult struct {
-	Url     string
-	Broken  bool
-	Message string
-}
-
-type CrawlRequest struct {
-	rootUrl string
+	Url     string `json:"url,omitempty"`
+	Broken  bool   `json:"broken,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 func New() *CrawlerService {
@@ -33,7 +29,7 @@ func (s *CrawlerService) Crawl(rootUrl string) (r []CrawlResult) {
 	var wg sync.WaitGroup
 
 	visitedUrls := make(map[string]bool)
-	chanExtractedLinks := make(chan string, 5)
+	chanExtractedLinks := make(chan string)
 
 	wg.Add(1)
 	go func() {

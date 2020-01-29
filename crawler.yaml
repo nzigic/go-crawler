@@ -5,7 +5,7 @@ targets:
     services:
       /services/crawler: CrawlerService
     package: crawler/services/crawler
-    out: web/api/crawler-service.ts
+    out: web/src/api/crawler-service.ts
     gorpc:
       - CrawlerService
     tsrpc:
@@ -13,4 +13,4 @@ targets:
 
 mappings:
   crawler/services/crawler:
-    out: web/api/crawler-vo.ts
+    out: web/src/api/crawler-vo.ts
