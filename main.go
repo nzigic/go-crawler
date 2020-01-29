@@ -1,7 +1,7 @@
 package main
 
 import (
-	crawler "crawler/services/crawler"
+	"crawler/services/crawler"
 	"fmt"
 	"net/http"
 	"os"
