@@ -9,15 +9,21 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
 	s := crawler.New()
 	if len(os.Args) != 0 && (os.Args[1] == "--web" || os.Args[1] == "-w") {
-		proxy := crawler.NewDefaultCrawlerServiceGoTSRPCProxy(s, []string{"*"})
-		fmt.Println("server started on port 8080")
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
 
-		http.ListenAndServe(":8080", proxy)
+		crawlerProxy := crawler.NewDefaultCrawlerServiceGoTSRPCProxy(s, []string{"*"})
+		crawlerMethods := []string{"/Crawl"}
+		registerMethods(mux, crawlerProxy, crawlerProxy.EndPoint, crawlerMethods)
+
+		fmt.Println("server started on port 8080")
+		http.ListenAndServe(":8080", mux)
 	}
 
 	start := time.Now()
@@ -48,4 +54,10 @@ func filterBrokenLinks(links []crawler.CrawlResult) (out []crawler.CrawlResult) 
 	}
 
 	return result
+}
+
+func registerMethods(mux *http.ServeMux, proxy http.Handler, proxyEndpoint string, methods []string) {
+	for _, method := range methods {
+		mux.Handle(proxyEndpoint+method, proxy)
+	}
 }

@@ -6,9 +6,10 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 type CrawlerService struct {
@@ -19,6 +20,21 @@ type CrawlResult struct {
 	Broken  bool   `json:"broken,omitempty"`
 	Message string `json:"message,omitempty"`
 }
+
+var (
+	urlsProcessed = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "crawler_processed_urls_total",
+		Help: "The total number of processed URLs",
+	})
+	successfulUrls = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "crawler_successful_urls_total",
+		Help: "The total number of successful (HTTP 200) URLs",
+	})
+	failedUrls = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "crawler_failed_urls_total",
+		Help: "The total number of failed (HTTP 500) URLs",
+	})
+)
 
 func New() *CrawlerService {
 	return &CrawlerService{}
@@ -42,10 +58,8 @@ func (s *CrawlerService) Crawl(rootUrl string) (r []CrawlResult) {
 	}()
 
 	isFirstRun := true
-	var linkCounter int64
-	var averageElapsedPerPage float64
-	start := time.Now()
 
+	// todo: Add average response time counter or something similar
 	for extractedLink := range chanExtractedLinks {
 		if !visitedUrls[extractedLink] {
 			visitedUrls[extractedLink] = true
@@ -74,11 +88,7 @@ func (s *CrawlerService) Crawl(rootUrl string) (r []CrawlResult) {
 
 				r = append(r, crawlResult)
 
-				linkCounter++
-				elapsed := time.Since(start)
-				averageElapsedPerPage = float64(elapsed.Milliseconds()) / float64(linkCounter)
-				fmt.Printf("\rProcessed: %d links, average time per URL: %fms", linkCounter, averageElapsedPerPage)
-
+				urlsProcessed.Inc()
 			}(extractedLink)
 		}
 	}
@@ -90,12 +100,16 @@ func (s *CrawlerService) Crawl(rootUrl string) (r []CrawlResult) {
 func extractLinks(pageUrl string) (r []string, err error) {
 	resp, errGet := http.Get(pageUrl)
 	if errGet != nil {
+		failedUrls.Inc()
 		return nil, errGet
 	}
 
 	if resp.StatusCode != 200 {
+		failedUrls.Inc()
 		return nil, errors.New(resp.Status)
 	}
+
+	successfulUrls.Inc()
 
 	defer resp.Body.Close()
 	doc, errNewDoc := goquery.NewDocumentFromReader(resp.Body)
@@ -129,5 +143,4 @@ func filterInternalLinks(extractedLinks []string, rootUrl string) []string {
 	}
 
 	return result
-
 }
