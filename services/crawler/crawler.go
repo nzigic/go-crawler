@@ -10,6 +10,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/rs/zerolog/log"
 )
 
 type CrawlerService struct {
@@ -101,11 +102,13 @@ func extractLinks(pageUrl string) (r []string, err error) {
 	resp, errGet := http.Get(pageUrl)
 	if errGet != nil {
 		failedUrls.Inc()
+		logError("fetch", errGet, pageUrl, 0)
 		return nil, errGet
 	}
 
 	if resp.StatusCode != 200 {
 		failedUrls.Inc()
+		logError("status", errGet, pageUrl, resp.StatusCode)
 		return nil, errors.New(resp.Status)
 	}
 
@@ -114,6 +117,7 @@ func extractLinks(pageUrl string) (r []string, err error) {
 	defer resp.Body.Close()
 	doc, errNewDoc := goquery.NewDocumentFromReader(resp.Body)
 	if errNewDoc != nil {
+		logError("parse", errGet, pageUrl, resp.StatusCode)
 		return nil, errNewDoc
 	}
 
@@ -123,6 +127,7 @@ func extractLinks(pageUrl string) (r []string, err error) {
 		link, hrefExists := s.Attr("href")
 		if hrefExists {
 			r = append(r, link)
+			logEvent("process", pageUrl, "Found a link '"+link+"'.")
 		}
 	})
 
@@ -134,6 +139,7 @@ func filterInternalLinks(extractedLinks []string, rootUrl string) []string {
 	for _, link := range extractedLinks {
 		if strings.HasPrefix(link, "/") {
 			result = append(result, rootUrl+link)
+			logEvent("process", rootUrl, "link '"+link+"' without root url fixed.")
 			continue
 		}
 
@@ -143,4 +149,20 @@ func filterInternalLinks(extractedLinks []string, rootUrl string) []string {
 	}
 
 	return result
+}
+
+func logError(name string, err error, root string, code int) {
+	log.Log().
+		Str("type", name+" error").
+		Str("root", root).
+		Int("code", code).
+		Err(err).
+		Send()
+}
+
+func logEvent(name string, root string, message string) {
+	log.Log().
+		Str("type", name+" event").
+		Str("root", root).
+		Msg(message)
 }

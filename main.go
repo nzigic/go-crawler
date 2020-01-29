@@ -10,9 +10,11 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/zerolog"
 )
 
 func main() {
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	s := crawler.New()
 	if len(os.Args) != 0 && (os.Args[1] == "--web" || os.Args[1] == "-w") {
 		mux := http.NewServeMux()
